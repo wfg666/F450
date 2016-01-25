@@ -872,10 +872,10 @@ Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M4.fp --apcs=int
 erwork --depend="f450 configuration\startup_stm32f407xx.d" -o"f450 configuratio
 n\startup_stm32f407xx.o" -IC:\workspaces\Keil\F450\MDK-ARM\RTE -IC:\Keil_v5\ARM
 \PACK\ARM\CMSIS\4.2.0\CMSIS\Include -IC:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.
-4.0 --predefine="__MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 514" --
-predefine="_RTE_ SETA 1" --predefine="STM32F407xx SETA 1" --list=startup_stm32f
-407xx.lst ../Drivers/CMSIS/Device/ST/STM32F4xx/Source/Templates/arm/startup_stm
-32f407xx.s
+4.0 --predefine="__EVAL SETA 1" --predefine="__MICROLIB SETA 1" --predefine="__
+UVISION_VERSION SETA 514" --predefine="_RTE_ SETA 1" --predefine="STM32F407xx S
+ETA 1" --list=startup_stm32f407xx.lst ../Drivers/CMSIS/Device/ST/STM32F4xx/Sour
+ce/Templates/arm/startup_stm32f407xx.s
 
 
 
@@ -2287,4 +2287,4 @@ Symbol: __main
 /arm/startup_stm32f407xx.s
 Comment: __main used once
 2 symbols
-445 symbols in table
+446 symbols in table

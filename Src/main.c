@@ -34,7 +34,7 @@
 #include "stm32f4xx_hal.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "./global.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -63,48 +63,6 @@ static void MX_USART3_UART_Init(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-uint8_t USART2RxBuffer[128];
-uint8_t USART3RxBuffer[128];
-uint8_t rcChannels[18];
-float PWMOutput[4];
-
-
-struct AHRSDataStruct
-{
-	int8_t acceX;
-	int8_t acceY;
-	int8_t acceZ;
-	int8_t gyroX;
-	int8_t gyroY;
-	int8_t gyroZ;
-	int16_t yaw;
-	int16_t pitch;
-	int16_t roll;
-	int16_t height;
-	int16_t baro;
-}AHRSData;
-
-float pitchAngleP,rollAngleP,yawAngleP;
-float pitchAngleI,rollAngleI,yawAngleI;
-float pitchAngleD,rollAngleD,yawAngleD;
-float pitchAngleSP,rollAngleSP,yawAngleSP;
-float pitchAngleErr,rollAngleErr,yawAngleErr;
-float pitchAngleLastErr,rollAngleLastErr,yawAngleLastErr;
-float pitchAngleErrInte,rollAngleErrInte,yawAngleErrInte;
-float pitchAngleAdjust,rollAngleAdjust,yawAngleAdjust;
-
-
-
-
-int32_t sysClock=0; //timer6 0.1ms   max:1 000 000 000
-
-__IO uint8_t AHRSReceived=0;
-__IO uint8_t rcReceived=0;
-__IO uint8_t shouldUpdateControl=0;
-
-__IO int32_t lastUpdateControlTime=0;
-
-
 
 /* USER CODE END 0 */
 
@@ -133,7 +91,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
 	HAL_TIM_Base_Start_IT(&htim6);
 	
-	HAL_UART_Receive_IT(&huart3,USART3RxBuffer,24);
+//	uint8_t aaa[]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+//	HAL_UART_Transmit_IT(&huart3,aaa, 16);
+	
+	HAL_UART_Receive_IT(&huart3,USART3RxBuffer,25);
 	HAL_UART_Receive_IT(&huart2,USART2RxBuffer,sizeof(AHRSData)+2);
 
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
@@ -173,19 +134,67 @@ int main(void)
 			if(USART3RxBuffer[0]==0x0f)
 			{
 				//todo
-					;
+					uint8_t *p_origin=USART3RxBuffer;
+					uint16_t *p_result=rcChannels;
+					int16_t countOrigin=0,countResult=0,i;
+					uint8_t filter=0x01;
+
+					(*p_result)=0;	//p_result置零
+					p_result--;		//p_result从int[0]开始，p_origin从char[1]开始
+					for(i=0; i<176; i++)
+					{	
+						countOrigin--;countResult--;
+						if(countOrigin<0)
+						{
+							countOrigin=7;	//Origin每8位指针移动
+							p_origin++;
+						}
+						if(countResult<0)
+						{
+							countResult=10;					//Result每11位指针移动
+							(*p_result)=(*p_result)<<1;		//撤销最后一次移位
+							p_result++;
+							(*p_result)=0;
+						}
+						(*p_result)|=(((*p_origin)&(filter))<<10);
+						(*p_result)=(*p_result)>>1;
+						(*p_origin)=(*p_origin)>>1;
+					}
+				
+					p_origin++;
+//					wireLessLost=(*p_origin)&0x04;
+//					digitalChannel2=(*p_origin)&0x02;//两个数字通道好像有一个有问题
+//					digitalChannel1=(*p_origin)&0x01;
+	
+				;
 			}
 			else
 			{
 				int32_t receiveTime = sysClock;
 				while(sysClock - receiveTime < 40 && sysClock <= receiveTime);//等1ms，重新收
 			}
-			AHRSReceived = 0;
-			HAL_UART_Receive_IT(&huart3,USART3RxBuffer,24);
+			rcReceived = 0;
+			HAL_UART_Receive_IT(&huart3,USART3RxBuffer,25);
 		}
 		
 		if(sysClock-lastUpdateControlTime >= 25)
 		{
+			
+			pitchAngleSP = (rcChannels[1]-1024)/1000.0*40;
+			rollAngleSP = (rcChannels[0]-1024)/1000.0*40;
+			
+			yawAngleSP += (rcChannels[3]-1024)/1000.0*0.2;
+			if(yawAngleSP > 360)
+				yawAngleSP -=360;
+			if(yawAngleSP < 0)
+				yawAngleSP +=360;
+			
+			throttle = 900 + rcChannels[2]/2;
+			
+			
+			
+			
+			
 			TIM_OC_InitTypeDef sConfigOC;
 			sConfigOC.OCMode = TIM_OCMODE_PWM1;
 			sConfigOC.Pulse = 0;
@@ -205,7 +214,7 @@ int main(void)
 			HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4);
 			HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_4);
 			
-			
+			lastUpdateControlTime = sysClock;
 
 		}
   }
@@ -298,7 +307,7 @@ void MX_TIM6_Init(void)
   htim6.Instance = TIM6;
   htim6.Init.Prescaler = 0;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 4200;
+  htim6.Init.Period = 8400;
   HAL_TIM_Base_Init(&htim6);
 
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
@@ -329,12 +338,12 @@ void MX_USART3_UART_Init(void)
 
   huart3.Instance = USART3;
   huart3.Init.BaudRate = 100000;
-  huart3.Init.WordLength = UART_WORDLENGTH_8B;
-  huart3.Init.StopBits = UART_STOPBITS_1;
-  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.WordLength = UART_WORDLENGTH_9B;
+  huart3.Init.StopBits = UART_STOPBITS_2;
+  huart3.Init.Parity = UART_PARITY_EVEN;
   huart3.Init.Mode = UART_MODE_TX_RX;
   huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_8;
   HAL_UART_Init(&huart3);
 
 }
@@ -373,6 +382,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	{
 		AHRSReceived = 1;
 	}
+	
+	if(huart->Instance == USART3)
+	{
+		rcReceived = 1;
+	}
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
@@ -380,6 +394,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if(htim->Instance==TIM6)
 	{
 		sysClock = (sysClock+1)%1000000000;
+		HAL_GPIO_WritePin(GPIOD, LD6_Pin,!HAL_GPIO_ReadPin(GPIOD, LD6_Pin));
 	}
 }
 /* USER CODE END 4 */

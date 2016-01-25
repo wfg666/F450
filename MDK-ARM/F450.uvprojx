@@ -526,6 +526,16 @@
               <FileType>1</FileType>
               <FilePath>../Src/stm32f4xx_it.c</FilePath>
             </File>
+            <File>
+              <FileName>global.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\global.c</FilePath>
+            </File>
+            <File>
+              <FileName>global.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Src\global.h</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>
