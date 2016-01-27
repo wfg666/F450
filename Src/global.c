@@ -8,9 +8,9 @@ float PWMOutput[4];
 
 __IO struct AHRSDataStruct AHRSData;
 
-__IO float pitchAngleP=0.0005,rollAngleP=0.0005,yawAngleP=0.001;
+__IO float pitchAngleP=0.00035,rollAngleP=0.00035,yawAngleP=0.00045;
 __IO float pitchAngleI=0,rollAngleI=0,yawAngleI=0;
-__IO float pitchAngleD=0.00000,rollAngleD=0.00000,yawAngleD=0.00000;
+__IO float pitchAngleD=0.00002,rollAngleD=0.00002,yawAngleD=0.00003;
 
 __IO float pitchAngleSP,rollAngleSP,yawAngleSP=0;
 

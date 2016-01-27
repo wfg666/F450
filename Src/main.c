@@ -85,19 +85,22 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM2_Init();
   MX_TIM6_Init();
-  MX_USART2_UART_Init();
-  MX_USART3_UART_Init();
-
-  /* USER CODE BEGIN 2 */
+	
 	HAL_TIM_Base_Start_IT(&htim6);
+  MX_USART2_UART_Init();
+	HAL_UART_Receive_IT(&huart2,USART2RxBuffer,sizeof(AHRSData)+2);
+  MX_USART3_UART_Init();
+	HAL_UART_Receive_IT(&huart3,USART3RxBuffer,25);
+  /* USER CODE BEGIN 2 */
+	
 	
 //	uint8_t aaa[]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 //	HAL_UART_Transmit_IT(&huart3,aaa, 16);
 
 //	for(__IO int i=0;i<10000;i++);
 	
-	HAL_UART_Receive_IT(&huart3,USART3RxBuffer,25);
-	HAL_UART_Receive_IT(&huart2,USART2RxBuffer,sizeof(AHRSData)+2);
+	
+	
 
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_2);
@@ -123,14 +126,27 @@ int main(void)
 			if(USART2RxBuffer[0]==0xaa && cs==0)
 			{
 				AHRSData = *((struct AHRSDataStruct *)(USART2RxBuffer+1));
+				HAL_UART_Receive_IT(&huart2,USART2RxBuffer,sizeof(AHRSData)+2);
+				HAL_GPIO_WritePin(GPIOD, LD5_Pin,(GPIO_PinState)!HAL_GPIO_ReadPin(GPIOD, LD5_Pin));
 			}
 			else
 			{
-				int32_t receiveTime = sysClock;
-				while(sysClock - receiveTime < 10 && sysClock >= receiveTime);//等1ms，重新收
+				__IO int32_t receiveTime = sysClock;
+				
+				uint8_t a='a';
+				HAL_UART_Transmit_IT(&huart3,&a, 1);
+				
+				while( (sysClock - receiveTime < 10) && (sysClock >= receiveTime) );//等1ms，重新收
+				//todo 有问题 偶尔迷之傻逼 红灯常亮或者不亮就是傻逼了
+//				MX_USART2_UART_Init();
+				HAL_UART_Receive_IT(&huart2,USART2RxBuffer,sizeof(AHRSData)+2);
 			}
+			
+			uint8_t b='b';
+			HAL_UART_Transmit_IT(&huart3,&b, 1);
+			
 			AHRSReceived = 0;
-			HAL_UART_Receive_IT(&huart2,USART2RxBuffer,sizeof(AHRSData)+2);
+			
 		}
 		
 		if(rcReceived)
@@ -184,10 +200,10 @@ int main(void)
 		if(sysClock-lastUpdateControlTime >= 25)
 		{
 			
-			pitchAngleSP = (rcChannels[1]-1024)/1000.0*400;
-			rollAngleSP = (rcChannels[0]-1024)/1000.0*400;
+			pitchAngleSP = (rcChannels[1]-1024)/1000.0*500;
+			rollAngleSP = (rcChannels[0]-1024)/1000.0*500;
 			
-			yawAngleSP += (rcChannels[3]-1024)/1000.0*0.2;
+			yawAngleSP += (rcChannels[3]-1024)/1000.0*0.3;
 			if(yawAngleSP > 3600)
 				yawAngleSP -=3600;
 			if(yawAngleSP < 0)
@@ -208,7 +224,7 @@ int main(void)
 			if(yawAngleErr<-1800)
 				yawAngleErr+=3600;
 			
-			yawAngleAdjust = -(yawAngleP * yawAngleErr + yawAngleD * AHRSData.gyroZ);
+			yawAngleAdjust = -(yawAngleP * yawAngleErr + yawAngleD * (-AHRSData.gyroZ));
 			
 			constrain(pitchAngleAdjust,-0.4f,0.4f);
 			constrain(rollAngleAdjust,-0.4f,0.4f);
@@ -424,6 +440,23 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	if(huart->Instance == USART3)
 	{
 		rcReceived = 1;
+	}
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+	if(huart->Instance == USART2)
+	{
+		AHRSReceived = 0;	 
+		MX_USART2_UART_Init();
+		HAL_UART_Receive_IT(&huart2,USART2RxBuffer,sizeof(AHRSData)+2);
+	}
+	
+	if(huart->Instance == USART3)
+	{
+		rcReceived = 0;  
+		MX_USART3_UART_Init();
+		HAL_UART_Receive_IT(&huart3,USART3RxBuffer,25);
 	}
 }
 
