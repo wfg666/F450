@@ -93,6 +93,8 @@ int main(void)
 	
 //	uint8_t aaa[]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 //	HAL_UART_Transmit_IT(&huart3,aaa, 16);
+
+//	for(__IO int i=0;i<10000;i++);
 	
 	HAL_UART_Receive_IT(&huart3,USART3RxBuffer,25);
 	HAL_UART_Receive_IT(&huart2,USART2RxBuffer,sizeof(AHRSData)+2);
@@ -111,6 +113,8 @@ int main(void)
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
+		__IO int s=sizeof(AHRSData);
+		
 		if(AHRSReceived)
 		{
 			uint8_t cs=0;
@@ -118,12 +122,12 @@ int main(void)
 				cs^=USART2RxBuffer[i];
 			if(USART2RxBuffer[0]==0xaa && cs==0)
 			{
-				AHRSData = *((struct AHRSDataStruct *)USART2RxBuffer);
+				AHRSData = *((struct AHRSDataStruct *)(USART2RxBuffer+1));
 			}
 			else
 			{
 				int32_t receiveTime = sysClock;
-				while(sysClock - receiveTime < 10 && sysClock <= receiveTime);//等1ms，重新收
+				while(sysClock - receiveTime < 10 && sysClock >= receiveTime);//等1ms，重新收
 			}
 			AHRSReceived = 0;
 			HAL_UART_Receive_IT(&huart2,USART2RxBuffer,sizeof(AHRSData)+2);
@@ -171,7 +175,7 @@ int main(void)
 			else
 			{
 				int32_t receiveTime = sysClock;
-				while(sysClock - receiveTime < 40 && sysClock <= receiveTime);//等1ms，重新收
+				while(sysClock - receiveTime < 40 && sysClock >= receiveTime);//等1ms，重新收
 			}
 			rcReceived = 0;
 			HAL_UART_Receive_IT(&huart3,USART3RxBuffer,25);
@@ -180,18 +184,52 @@ int main(void)
 		if(sysClock-lastUpdateControlTime >= 25)
 		{
 			
-			pitchAngleSP = (rcChannels[1]-1024)/1000.0*40;
-			rollAngleSP = (rcChannels[0]-1024)/1000.0*40;
+			pitchAngleSP = (rcChannels[1]-1024)/1000.0*400;
+			rollAngleSP = (rcChannels[0]-1024)/1000.0*400;
 			
 			yawAngleSP += (rcChannels[3]-1024)/1000.0*0.2;
-			if(yawAngleSP > 360)
-				yawAngleSP -=360;
+			if(yawAngleSP > 3600)
+				yawAngleSP -=3600;
 			if(yawAngleSP < 0)
-				yawAngleSP +=360;
+				yawAngleSP +=3600;
 			
-			throttle = 900 + rcChannels[2]/2;
+			throttle = 0.900 + rcChannels[2]/2000.0;
 			
 			
+			
+			pitchAngleErr = AHRSData.pitch - pitchAngleSP;
+			pitchAngleAdjust = -(pitchAngleP * pitchAngleErr + pitchAngleD * AHRSData.gyroY);
+			rollAngleErr = AHRSData.roll - rollAngleSP;
+			rollAngleAdjust = -(rollAngleP * rollAngleErr + rollAngleD * AHRSData.gyroX);
+			
+			yawAngleErr = AHRSData.yaw - yawAngleSP;
+			if(yawAngleErr>1800)
+				yawAngleErr-=3600;
+			if(yawAngleErr<-1800)
+				yawAngleErr+=3600;
+			
+			yawAngleAdjust = -(yawAngleP * yawAngleErr + yawAngleD * AHRSData.gyroZ);
+			
+			constrain(pitchAngleAdjust,-0.4f,0.4f);
+			constrain(rollAngleAdjust,-0.4f,0.4f);
+			constrain(yawAngleAdjust,-0.4f,0.4f);
+			
+			
+			pwm1 = throttle - pitchAngleAdjust - rollAngleAdjust + yawAngleAdjust;
+			pwm2 = throttle + pitchAngleAdjust + rollAngleAdjust + yawAngleAdjust;
+			pwm3 = throttle - pitchAngleAdjust + rollAngleAdjust - yawAngleAdjust;
+			pwm4 = throttle + pitchAngleAdjust - rollAngleAdjust - yawAngleAdjust;
+			
+			if(throttle<1.1f)
+			{
+				pwm1=0.9;pwm2=0.9;pwm3=0.9;pwm4=0.9;yawAngleSP=AHRSData.yaw;
+			}
+			
+			constrain(pwm1,0.9f,2.1f);
+			constrain(pwm2,0.9f,2.1f);
+			constrain(pwm3,0.9f,2.1f);
+			constrain(pwm4,0.9f,2.1f);
+				
 			
 			
 			
@@ -201,16 +239,16 @@ int main(void)
 			sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 			sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
 			
-			sConfigOC.Pulse = 0.9*84003;
+			sConfigOC.Pulse = pwm1*84003;
 			HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1);
 			HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
-			sConfigOC.Pulse = 0.9*84003;
+			sConfigOC.Pulse = pwm2*84003;
 			HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2);
 			HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_2);
-			sConfigOC.Pulse = 0.9*84003;
+			sConfigOC.Pulse = pwm3*84003;
 			HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3);
 			HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_3);
-			sConfigOC.Pulse = 0.9*84003;
+			sConfigOC.Pulse = pwm4*84003;
 			HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4);
 			HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_4);
 			
@@ -394,7 +432,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if(htim->Instance==TIM6)
 	{
 		sysClock = (sysClock+1)%1000000000;
-		HAL_GPIO_WritePin(GPIOD, LD6_Pin,!HAL_GPIO_ReadPin(GPIOD, LD6_Pin));
+		HAL_GPIO_WritePin(GPIOD, LD6_Pin,(GPIO_PinState)!HAL_GPIO_ReadPin(GPIOD, LD6_Pin));
 	}
 }
 /* USER CODE END 4 */

@@ -8,13 +8,15 @@ float PWMOutput[4];
 
 __IO struct AHRSDataStruct AHRSData;
 
-__IO float pitchAngleP,rollAngleP,yawAngleP;
-__IO float pitchAngleI,rollAngleI,yawAngleI;
-__IO float pitchAngleD,rollAngleD,yawAngleD;
+__IO float pitchAngleP=0.0005,rollAngleP=0.0005,yawAngleP=0.001;
+__IO float pitchAngleI=0,rollAngleI=0,yawAngleI=0;
+__IO float pitchAngleD=0.00000,rollAngleD=0.00000,yawAngleD=0.00000;
 
 __IO float pitchAngleSP,rollAngleSP,yawAngleSP=0;
 
 __IO float throttle;
+
+__IO float pwm1,pwm2,pwm3,pwm4;
 
 __IO float pitchAngleErr,rollAngleErr,yawAngleErr;
 __IO float pitchAngleLastErr,rollAngleLastErr,yawAngleLastErr;
